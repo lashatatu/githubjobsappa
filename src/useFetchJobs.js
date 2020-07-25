@@ -1,5 +1,6 @@
-import { useReducer, useEffect } from 'react'
+import {useReducer, useEffect} from 'react'
 import axios from 'axios'
+
 
 const ACTIONS = {
     MAKE_REQUEST: 'make-request',
@@ -16,27 +17,33 @@ function reducer(state, action) {
         case ACTIONS.GET_DATA:
             return {...state, loading: false, jobs: action.payload.jobs}
         case ACTIONS.ERROR:
-            return {...state, loading: false, error: action.payload, jobs: []}
+            return {...state, loading: false, error: action.payload.error, jobs: []}
         default:
             return state
     }
-
 }
 
 export default function useFetchJobs(params, page) {
-    const [state, dispatch] = useReducer(params, {jobs: [], loading: true})
+    const [state, dispatch] = useReducer(reducer, {jobs: [], loading: true})
 
     useEffect(() => {
+        const cancelToken = axios.CancelToken.source()
         dispatch({type: ACTIONS.MAKE_REQUEST})
         axios.get(BASE_URL, {
-            params: {markdown: true, page: page, ...params}.than(res => {
-                dispatch({type: ACTIONS.GET_DATA, payload: {jobs: res.data}})
-            })
-        }).catch(e=>{
-            dispatch({type: ACTIONS.GET_DATA, payload: {error: e}})
+            cancelToken: cancelToken.token,
+            params: {markdown: true, page: page, ...params}
+        }).then(res => {
+            dispatch({type: ACTIONS.GET_DATA, payload: {jobs: res.data}})
+        }).catch(e => {
+            if (axios.isCancel(e)) return
+            dispatch({type: ACTIONS.ERROR, payload: {error: e}})
         })
+
+        return ()=>{
+            cancelToken.cancel()
+        }
     }, [params, page])
 
-    dispatch({type: 'hello', payload: {x: 3}})
+
     return state
 }
